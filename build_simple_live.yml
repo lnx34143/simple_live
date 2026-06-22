@@ -1,2 +1,151 @@
-Android 手机 APK
-Android TV APK
+name: Build Simple Live Personal
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-app:
+    name: Windows desktop app
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      - name: Build Windows release
+        run: |
+          cd simple_live_app
+          flutter build windows --release
+
+      - name: Zip Windows build
+        shell: pwsh
+        run: |
+          cd simple_live_app
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\simple_live_windows.zip -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-windows
+          path: simple_live_app/build/simple_live_windows.zip
+
+  android-phone-apk:
+    name: Android phone APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Create temporary Android signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/simple_live_app/android/upload-keystore.jks" \
+            -storepass 123456 -keypass 123456 \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias upload \
+            -dname "CN=Simple Live,O=Personal,C=CN"
+          cat > simple_live_app/android/key.properties <<EOF
+          storeFile=$GITHUB_WORKSPACE/simple_live_app/android/upload-keystore.jks
+          storePassword=123456
+          keyPassword=123456
+          keyAlias=upload
+          EOF
+
+      - name: Get packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      - name: Build Android APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload Android APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-android-apk
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+  android-tv-apk:
+    name: Android TV APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Create temporary Android TV signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/simple_live_tv_app/android/upload-keystore.jks" \
+            -storepass 123456 -keypass 123456 \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias upload \
+            -dname "CN=Simple Live TV,O=Personal,C=CN"
+          cat > simple_live_tv_app/android/key.properties <<EOF
+          storeFile=$GITHUB_WORKSPACE/simple_live_tv_app/android/upload-keystore.jks
+          storePassword=123456
+          keyPassword=123456
+          keyAlias=upload
+          EOF
+
+      - name: Get packages
+        run: |
+          cd simple_live_tv_app
+          flutter pub get
+
+      - name: Build Android TV APK
+        run: |
+          cd simple_live_tv_app
+          flutter build apk --release --split-per-abi
+
+      - name: Upload Android TV APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-tv-apk
+          path: |
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_tv_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
